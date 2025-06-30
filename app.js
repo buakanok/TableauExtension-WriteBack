@@ -10,6 +10,9 @@ const commentForm = document.getElementById('commentForm');
 const commentInput = document.getElementById('comment');
 const categorySelect = document.getElementById('category');
 const submitButton = commentForm ? commentForm.querySelector('button[type="submit"]') : null;
+const selectedCustomerDisplay = document.getElementById('selectedCustomer'); // NEW UI Element ID
+
+let selectedCustomerName = null; // Variable to store the currently selected customer name
 
 // Function to show a message (loading, success, or error)
 function showMessage(element, message, type = 'info') {
@@ -31,6 +34,59 @@ function hideAllMessages() {
     if (errorMessage) errorMessage.classList.add('hidden');
 }
 
+async function onMarksSelected(selectionEvent) {
+    // Hide messages when selection changes, ready for new interaction
+    hideAllMessages(); 
+    selectedCustomerDisplay.textContent = 'No customer selected.'; // Reset display
+
+    let dashboard = tableau.extensions.dashboardContent.dashboard;
+    let selectedWorksheet = selectionEvent.getWorksheet(); // Get the worksheet where marks were selected
+
+    try {
+        const marks = await selectedWorksheet.getSelectedMarksAsync();
+        const dataTable = marks.data[0]; // Assuming only one data table for simplicity
+
+        if (dataTable && dataTable.data.length > 0) {
+            // Find the 'Customer Name' column
+            const customerNameColumn = dataTable.columns.find(column => column.fieldName === 'Customer Name');
+
+            if (customerNameColumn) {
+                // Get the data for the 'Customer Name' column
+                const customerNames = dataTable.data.map(row => row[customerNameColumn.index].value);
+
+                if (customerNames.length > 0) {
+                    // For simplicity, take the first selected customer name
+                    selectedCustomerName = customerNames[0];
+                    selectedCustomerDisplay.textContent = `Selected Customer: ${selectedCustomerName}`;
+                    console.log('Selected Customer:', selectedCustomerName);
+
+                    if (customerNames.length > 1) {
+                        showMessage(errorMessage, 'Multiple customers selected. Only using the first one.', 'error');
+                    } else {
+                        hideAllMessages(); // Clear error if it was shown due to multiple selections previously
+                    }
+                } else {
+                    selectedCustomerName = null;
+                    selectedCustomerDisplay.textContent = 'No customer data in selection.';
+                }
+            } else {
+                selectedCustomerName = null;
+                selectedCustomerDisplay.textContent = 'No "Customer Name" field found in selection.';
+                showMessage(errorMessage, 'The selected chart does not contain a "Customer Name" field.', 'error');
+            }
+        } else {
+            selectedCustomerName = null;
+            selectedCustomerDisplay.textContent = 'No marks selected.';
+            console.log('No marks selected on worksheet:', selectedWorksheet.name);
+        }
+    } catch (error) {
+        console.error('Error handling mark selection:', error);
+        showMessage(errorMessage, `Error processing selection: ${error.message}`, 'error');
+        selectedCustomerName = null;
+    }
+}
+
+
 // Main initialization function for Tableau Extension
 async function initializeTableauExtension() {
     showMessage(loadingMessage, 'Initializing Tableau Extension...');
@@ -39,6 +95,13 @@ async function initializeTableauExtension() {
         await tableau.extensions.initializeAsync();
         console.log('Tableau Extension Initialized!');
         hideAllMessages(); // Hide loading message on success
+
+        // Add Mark Selection Changed Event Listener to all Worksheets
+        let dashboard = tableau.extensions.dashboardContent.dashboard;
+        dashboard.worksheets.forEach(function(worksheet) {
+            worksheet.addEventListener(tableau.TableauEventType.MarkSelectionChanged, onMarksSelected);
+            console.log('Attached mark selection listener to worksheet:', worksheet.name);
+        });
 
         // Set up form submission handler
         if (commentForm) {
@@ -59,14 +122,16 @@ async function initializeTableauExtension() {
 async function handleCommentSubmit(event) {
     event.preventDefault(); // Prevent default form submission
 
-    if (WEB_APP_URL === "YOUR_RENDER_CORS_PROXY_URL_HERE/YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE") {
-        showMessage(errorMessage, "Error: Please replace the placeholder URL in app.js with your actual deployed URLs.", 'error');
+    if (!selectedCustomerName) {
+        showMessage(errorMessage, 'Please select a customer from the chart first.', 'error');
         return;
     }
 
     const commentText = commentInput.value.trim();
     const category = categorySelect.value;
-    const userId = tableau.extensions.environment.uniqueUserId;
+    const submittedByUserId = tableau.extensions.environment.uniqueUserId ||
+                              localStorage.getItem('tableauExtensionClientId') ||
+                              'N/A'; // Use our robust user ID for the submitter
 
     if (!commentText) {
         showMessage(errorMessage, 'Comment cannot be empty. Please enter some text.', 'error');
@@ -78,9 +143,10 @@ async function handleCommentSubmit(event) {
 
     try {
         const dataToSend = {
-            userId: userId,
+            customerName: selectedCustomerName, // This is our new unique ID for the sheet lookup
             comment: commentText,
-            category: category
+            category: category,
+            submittedByUserId: submittedByUserId // Who submitted the comment
         };
 
         const response = await fetch(WEB_APP_URL, {
