@@ -42,19 +42,16 @@ async function onMarksSelected(selectionEvent) {
     let selectedWorksheet = selectionEvent.getWorksheet(); // Get the worksheet where marks were selected
 
     try {
-        const marks = await selectedWorksheet.getSelectedMarksAsync();
+        const marks = await selectedWorksheet.getSelectedMarksAsync(); // Use selectedWorksheet directly
         const dataTable = marks.data[0]; // Assuming only one data table for simplicity
 
         if (dataTable && dataTable.data.length > 0) {
-            // Find the 'Customer Name' column
             const customerNameColumn = dataTable.columns.find(column => column.fieldName === 'Customer Name');
 
             if (customerNameColumn) {
-                // Get the data for the 'Customer Name' column
                 const customerNames = dataTable.data.map(row => row[customerNameColumn.index].value);
 
                 if (customerNames.length > 0) {
-                    // For simplicity, take the first selected customer name
                     selectedCustomerName = customerNames[0];
                     selectedCustomerDisplay.textContent = `Selected Customer: ${selectedCustomerName}`;
                     console.log('Selected Customer:', selectedCustomerName);
@@ -62,7 +59,7 @@ async function onMarksSelected(selectionEvent) {
                     if (customerNames.length > 1) {
                         showMessage(errorMessage, 'Multiple customers selected. Only using the first one.', 'error');
                     } else {
-                        hideAllMessages(); // Clear error if it was shown due to multiple selections previously
+                        hideAllMessages();
                     }
                 } else {
                     selectedCustomerName = null;
@@ -71,12 +68,11 @@ async function onMarksSelected(selectionEvent) {
             } else {
                 selectedCustomerName = null;
                 selectedCustomerDisplay.textContent = 'No "Customer Name" field found in selection.';
-                showMessage(errorMessage, 'The selected chart does not contain a "Customer Name" field.', 'error');
+                showMessage(errorMessage, 'The selected chart does not contain a "Customer Name" field. Please select marks from a chart that has Customer Name.', 'error');
             }
         } else {
             selectedCustomerName = null;
             selectedCustomerDisplay.textContent = 'No marks selected.';
-            console.log('No marks selected on worksheet:', selectedWorksheet.name);
         }
     } catch (error) {
         console.error('Error handling mark selection:', error);
