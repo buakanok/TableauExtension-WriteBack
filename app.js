@@ -39,7 +39,6 @@ async function onMarksSelected(selectionEvent) {
     hideAllMessages(); 
     selectedCustomerDisplay.textContent = 'No customer selected.'; // Reset display
 
-    let dashboard = tableau.extensions.dashboardContent.dashboard;
     let selectedWorksheet = selectionEvent.getWorksheet(); // Get the worksheet where marks were selected
 
     try {
