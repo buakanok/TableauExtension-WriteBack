@@ -66,7 +66,7 @@ async function handleCommentSubmit(event) {
 
     const commentText = commentInput.value.trim();
     const category = categorySelect.value;
-    const userId = tableau.extensions.ExtensionMode.viewing; 
+    const userId = tableau.extensions.environment.uniqueUserId;
 
     if (!commentText) {
         showMessage(errorMessage, 'Comment cannot be empty. Please enter some text.', 'error');
