@@ -34,13 +34,13 @@ function hideAllMessages() {
     if (errorMessage) errorMessage.classList.add('hidden');
 }
 
-async function onMarksSelected(event, selectedWorksheet) {
+async function onMarksSelected(event, selectedWorksheet) { // 'selectedWorksheet' is now correctly passed
     // Hide messages when selection changes, ready for new interaction
     hideAllMessages(); 
     selectedCustomerDisplay.textContent = 'No customer selected.'; // Reset display
 
     try {
-        const marks = await selectedWorksheet.getSelectedMarksAsync(); // Use selectedWorksheet directly
+        const marks = await selectedWorksheet.getSelectedMarksAsync(); // Directly use selectedWorksheet
         const dataTable = marks.data[0]; // Assuming only one data table for simplicity
 
         if (dataTable && dataTable.data.length > 0) {
@@ -71,6 +71,7 @@ async function onMarksSelected(event, selectedWorksheet) {
         } else {
             selectedCustomerName = null;
             selectedCustomerDisplay.textContent = 'No marks selected.';
+            console.log('No marks selected on worksheet:', selectedWorksheet.name);
         }
     } catch (error) {
         console.error('Error handling mark selection:', error);
@@ -89,14 +90,17 @@ async function initializeTableauExtension() {
         console.log('Tableau Extension Initialized!');
         hideAllMessages(); // Hide loading message on success
 
+        // --- CRITICAL FIX HERE ---
         // Add Mark Selection Changed Event Listener to all Worksheets
         let dashboard = tableau.extensions.dashboardContent.dashboard;
         dashboard.worksheets.forEach(function(worksheet) {
+            // Correct way to pass both event and worksheet context
             worksheet.addEventListener(tableau.TableauEventType.MarkSelectionChanged, function(event) {
                 onMarksSelected(event, worksheet); // Call onMarksSelected with both arguments
             });
             console.log('Attached mark selection listener to worksheet:', worksheet.name);
         });
+        // --- END CRITICAL FIX ---
 
         // Set up form submission handler
         if (commentForm) {
@@ -117,6 +121,19 @@ async function initializeTableauExtension() {
 async function handleCommentSubmit(event) {
     event.preventDefault(); // Prevent default form submission
 
+    if (WEB_APP_URL === "YOUR_RENDER_CORS_PROXY_URL_HERE/YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE") {
+        showMessage(errorMessage, 'Error: Please replace the placeholder URL in app.js with your actual deployed URLs.', 'error');
+        return;
+    }
+
+    // Add a general check for dashboard readiness (good practice, as dashboard.worksheets is accessed in init)
+    if (!tableau.extensions.dashboardContent || !tableau.extensions.dashboardContent.dashboard) {
+        showMessage(errorMessage, 'Tableau dashboard content is not fully loaded. Please try again in a moment.', 'error');
+        console.error('Tableau dashboardContent or dashboard object is undefined when submitting.');
+        return; 
+    }
+
+    // Validate selected customer name
     if (!selectedCustomerName) {
         showMessage(errorMessage, 'Please select a customer from the chart first.', 'error');
         return;
@@ -152,25 +169,18 @@ async function handleCommentSubmit(event) {
             body: JSON.stringify(dataToSend)
         });
 
-        // --- CRITICAL CHANGE HERE ---
         if (!response.ok) {
-            // Only attempt to read text if response is NOT OK (i.e., an error from server)
             const errorResponseText = await response.text(); 
             console.error("Server raw error response:", errorResponseText);
             throw new Error(`Server responded with status ${response.status}. See console for details.`);
         }
 
-        // If response is OK, DO NOT parse it as JSON if it might be empty or non-JSON.
-        // Instead, assume success if response.ok is true.
         console.log('Comment successfully written to Google Sheet (assuming success from 200 OK status).');
 
-        // Direct success handling if response.ok
         commentInput.value = '';
         categorySelect.value = 'General';
         showMessage(successMessage, 'Comment submitted successfully!');
         setTimeout(hideAllMessages, 3000);
-
-        // --- END CRITICAL CHANGE ---
 
     } catch (error) {
         console.error('Error submitting comment to Google Sheet:', error);
@@ -178,7 +188,6 @@ async function handleCommentSubmit(event) {
     } finally {
         if (submitButton) submitButton.disabled = false;
     }
-
 }
 
 // Ensure DOM is fully loaded before initializing
