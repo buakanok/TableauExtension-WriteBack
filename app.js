@@ -34,12 +34,10 @@ function hideAllMessages() {
     if (errorMessage) errorMessage.classList.add('hidden');
 }
 
-async function onMarksSelected(selectionEvent) {
+async function onMarksSelected(event, selectedWorksheet) {
     // Hide messages when selection changes, ready for new interaction
     hideAllMessages(); 
     selectedCustomerDisplay.textContent = 'No customer selected.'; // Reset display
-
-    let selectedWorksheet = selectionEvent.getWorksheet(); // Get the worksheet where marks were selected
 
     try {
         const marks = await selectedWorksheet.getSelectedMarksAsync(); // Use selectedWorksheet directly
@@ -94,7 +92,9 @@ async function initializeTableauExtension() {
         // Add Mark Selection Changed Event Listener to all Worksheets
         let dashboard = tableau.extensions.dashboardContent.dashboard;
         dashboard.worksheets.forEach(function(worksheet) {
-            worksheet.addEventListener(tableau.TableauEventType.MarkSelectionChanged, onMarksSelected);
+            worksheet.addEventListener(tableau.TableauEventType.MarkSelectionChanged, function(event) {
+                onMarksSelected(event, worksheet); // Call onMarksSelected with both arguments
+            });
             console.log('Attached mark selection listener to worksheet:', worksheet.name);
         });
 
